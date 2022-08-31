@@ -1,0 +1,457 @@
+<%@LANGUAGE="VBSCRIPT" CODEPAGE="65001"%>
+<%
+'/////////////////////////////////////////////////////////
+'/////////////////////////////////////////////////////////
+'/////////////////////////////////////////////////////////
+'/// Pagina:          DatosRMC-ajax.asp
+'/// Fecha creacion:  18/05/2021
+'/// Editor:          Fernando Rodriguez
+'/// Correo editor:   fexrodriguez@lkqcorp.com
+'/// Descripcion:     Procesas para el mostrar el reporte de la pantalla principal en un DIV
+'/// 
+'/// --- BITACORA DE EDICION -----------------------------
+'/// 18/05/2021    Inicio de programacion.
+'/// 15/06/2021    Modificacion - Fernando Rodriguez se agrego validacion en prueba de compresion en RMC en la cual se evaluaran los resultados de los 10 cilindros en base a eso mostrar un resultado.
+'/// 
+'/////////////////////////////////////////////////////////
+'/////////////////////////////////////////////////////////
+'/////////////////////////////////////////////////////////
+%>
+<%
+'On Error Resume Next 
+
+' ************ Eliminaci�n de cache *****************
+Response.Expires = 0
+Response.ExpiresAbsolute = Now() - 1
+Response.AddHeader "pragma","no-cache"
+Response.AddHeader "cache-control","private"
+Response.AddHeader "cache-control","no-cache"
+Response.AddHeader "cache-control","no-store"
+Response.CacheControl = "no-cache"
+'Response.Buffer = False
+
+'// Validar si es un usuario con registro previo de acceso //
+If (Session("UserFP"&Session.SessionID) = "") And Trim(Request.QueryString("Session")) = "" And Trim(Request.QueryString("Categoria")) = "" Then
+  Response.Redirect("/fp_lkq_motors/login.asp")  
+End If
+%>
+<!--#include virtual="/fp_lkq_motors/Connections/conn.asp" -->
+<!--#include virtual="/fp_lkq_motors/assets/includes/RFC1321.asp" -->
+<!--#include virtual="/fp_lkq_motors/assets/includes/functions.asp" -->
+<!--#include virtual="/fp_lkq_motors/assets/includes/aspJSON1.19.asp" -->
+<SCRIPT RUNAT=SERVER LANGUAGE=VBSCRIPT>
+function DoDateTime(str, nNamedFormat, nLCID)
+  dim strRet
+  dim nOldLCID
+
+  strRet = str
+  If (nLCID > -1) Then
+    oldLCID = Session.LCID
+  End If
+
+  On Error Resume Next
+
+  If (nLCID > -1) Then
+    Session.LCID = nLCID
+  End If
+
+  If ((nLCID < 0) Or (Session.LCID = nLCID)) Then
+    strRet = FormatDateTime(str, nNamedFormat)
+  End If
+
+  If (nLCID > -1) Then
+    Session.LCID = oldLCID
+  End If
+
+  DoDateTime = strRet
+End Function
+</SCRIPT>
+<% 
+
+strPrograma	= Trim(Request.Form("programa"))
+strModelo   = Trim(Request.Form("modelo"))
+dtmFechaIni       = Trim(Request.Form("DateIni"))
+dtmFechaFin       = Trim(Request.Form("DateFin"))
+
+If strPrograma = "0" Then strPrograma = "" End IF
+If strModelo = "0" Then strModelo    = "" End IF
+
+strSQL = ""
+
+
+If strPrograma <> "" Then
+    strSQL = "WHERE R.Program IN ('"&strPrograma&"')"
+End If
+
+If strPrograma <> "" Then
+    If strModelo <> ""  Then
+        strSQL = "AND R.Modelo IN ('"&strModelo&"')"
+    End If
+Else
+    If strModelo <> ""  Then
+        strSQL = "WHERE R.Modelo IN ('"&strModelo&"')"
+    End If
+End If
+
+IF dtmFechaIni <> "-1" AND strPrograma <> ""  OR strModelo <> "" Then
+    strSQL = strSQL &"AND CONVERT(VARCHAR,CONVERT(DATETIME,R.DATE,101),112) BETWEEN CONVERT(VARCHAR,CONVERT(DATETIME,'"&dtmFechaIni&"',103),112) AND CONVERT(VARCHAR,CONVERT(DATETIME,'"&dtmFechaFin&"',103),112) "
+ElseIF dtmFechaIni <> "-1" AND strPrograma = ""  AND strModelo = "" Then 
+    strSQL = strSQL &"WHERE CONVERT(VARCHAR,CONVERT(DATETIME,R.DATE,101),112) BETWEEN CONVERT(VARCHAR,CONVERT(DATETIME,'"&dtmFechaIni&"',103),112) AND CONVERT(VARCHAR,CONVERT(DATETIME,'"&dtmFechaFin&"',103),112) "
+Else   
+End IF
+
+
+
+cmd.CommandTimeout = 4000
+cmd.CommandText = "SELECT *,(SELECT MIN(Resultado) FROM( "&_
+                                    "SELECT C,Resultado "&_
+                                    "FROM ( "&_
+                                    "SELECT CYL1COMP,CYL2COMP,CYL3COMP,CYL4COMP,CASE  WHEN CYL5RESULTS <> '-----' THEN CYL5COMP ELSE '0' END AS CYL5COMP ,CASE  WHEN CYL6RESULTS <> '-----' THEN CYL6COMP ELSE '0' END AS CYL6COMP ,CASE  WHEN CYL7RESULTS <> '-----' THEN CYL7COMP ELSE '0' END AS CYL7COMP ,CASE  WHEN CYL8RESULTS <> '-----' THEN CYL8COMP ELSE '0' END AS CYL8COMP ,CASE  WHEN CYL9RESULTS <> '-----' THEN CYL9COMP ELSE '0' END AS CYL9COMP , CASE  WHEN CYL10RESULTS <> '-----' THEN CYL10COMP ELSE '0' END AS CYL10COMP FROM (SELECT * FROM Quality_RMC R WHERE R.RegistroID IN (X.RegistroID) "&_
+                                        "UNION ALL "&_
+                                    "SELECT * FROM Quality_RMC R  WHERE R.RegistroID IN (X.RegistroID))X "&_
+                                    ") C "&_
+                                    "UNPIVOT(Resultado FOR [C] IN (CYL1COMP,CYL2COMP,CYL3COMP,CYL4COMP,CYL5COMP,CYL6COMP,CYL7COMP,CYL8COMP,CYL9COMP,CYL10COMP))AS P "&_
+                                    ")Y WHERE Resultado > 0)Minimo,(SELECT MAX(Resultado) FROM( "&_
+                                    "SELECT C,Resultado "&_
+                                    "FROM ( "&_
+                                    "SELECT CYL1COMP,CYL2COMP,CYL3COMP,CYL4COMP,CASE  WHEN CYL5RESULTS <> '-----' THEN CYL5COMP ELSE '0' END AS CYL5COMP ,CASE  WHEN CYL6RESULTS <> '-----' THEN CYL6COMP ELSE '0' END AS CYL6COMP ,CASE  WHEN CYL7RESULTS <> '-----' THEN CYL7COMP ELSE '0' END AS CYL7COMP ,CASE  WHEN CYL8RESULTS <> '-----' THEN CYL8COMP ELSE '0' END AS CYL8COMP ,CASE  WHEN CYL9RESULTS <> '-----' THEN CYL9COMP ELSE '0' END AS CYL9COMP , CASE  WHEN CYL10RESULTS <> '-----' THEN CYL10COMP ELSE '0' END AS CYL10COMP FROM (SELECT * FROM Quality_RMC R WHERE R.RegistroID IN (X.RegistroID) "&_
+                                        "UNION ALL "&_
+                                    "SELECT * FROM Quality_RMC R  WHERE R.RegistroID IN (X.RegistroID))X "&_
+                                    ") C "&_
+                                    "UNPIVOT(Resultado FOR [C] IN (CYL1COMP,CYL2COMP,CYL3COMP,CYL4COMP,CYL5COMP,CYL6COMP,CYL7COMP,CYL8COMP,CYL9COMP,CYL10COMP))AS P "&_
+                                    ")Y WHERE Resultado > 0)Maximo FROM (SELECT DISTINCT R.*,M.Modelo FROM Quality_RMC R INNER JOIN Production_Motors_Multiplant  M ON R.NoSerie = M.Serie INNER JOIN Quality_RMC QR ON QR.RegistroID = R.RegistroID AND R.RegistroID = (SELECT TOP 1 RegistroID FROM Quality_RMC WHERE NoSerie =  QR.NoSerie ORDER BY RegistroID DESC)"&strSQL&" "&_
+                    "UNION ALL "&_
+                    "SELECT DISTINCT R.*,M.Modelo FROM Quality_RMC R INNER JOIN Production_Motors_Multiplant_History  M ON R.NoSerie = M.Serie  INNER JOIN Quality_RMC QR ON QR.RegistroID = R.RegistroID AND R.RegistroID = (SELECT TOP 1 RegistroID FROM Quality_RMC WHERE NoSerie =  QR.NoSerie ORDER BY RegistroID DESC)"&strSQL&")X ORDER BY Date ASC"
+cmd.Prepared = true
+Set rsDatos = cmd.Execute
+
+
+
+If Not rsDatos.Eof Then
+
+%>
+
+             
+    <% 
+    intContador = 1
+    intJson = 0
+    Set oJSON = New aspJSON
+
+    With oJSON.data  
+    .Add "data", oJSON.Collection()
+        With oJSON.data("data")
+        
+        While Not rsDatos.Eof 
+            
+        .Add intJson, oJSON.Collection()                  'Create unnamed object
+        With .item(intJson)
+            .Add "id", intContador
+            .Add "sn", UCase(Trim(rsDatos("NoSerie")))
+            .Add "date", Trim(rsDatos("Date"))
+            .Add "hour", Trim(rsDatos("Time"))
+            .Add "program", Trim(rsDatos("Program"))
+            .Add "model", UCase(Trim(rsDatos("Modelo")))
+            %>
+            <%IF (Trim(rsDatos("RUNINOILPSI")) >= Trim(rsDatos("MINOILPSI")))  Or (Trim(rsDatos("RUNINOILPSI")) <= Trim(rsDatos("MAXOILPSI"))) THEN%>
+                
+                <%
+                intDatos = intDatos + 1
+                intDatosTotal = intDatosTotal + 1
+                %>
+            <%ELSEIF (Trim(rsDatos("RUNINOILPSI")) < Trim(rsDatos("MINOILPSI")))  Or (Trim(rsDatos("RUNINOILPSI")) > Trim(rsDatos("MAXOILPSI"))) THEN%>
+                
+                <%
+                intDatos = intDatos - 1
+                intDatosTotal = intDatosTotal + 1
+                %>
+            <%ELSE%>
+                
+                <%
+                intDatos = intDatos
+                intDatosTotal = intDatosTotal
+                %>
+            <%END IF%>
+            <%
+            IF Trim(rsDatos("CYL1RESULTS")) = "PASSED" THEN
+                intDatosCyl = intDatosCyl + 1
+                intDatosTotalCyl = intDatosTotalCyl + 1
+            ELSE
+                IF Trim(rsDatos("CYL1RESULTS")) = "FAILED" THEN
+                    intDatosCyl = intDatosCyl - 1
+                    intDatosTotalCyl = intDatosTotalCyl + 1
+                END IF
+            END IF
+            %>
+            <%
+            IF Trim(rsDatos("CYL2RESULTS")) = "PASSED" THEN
+                intDatosCyl = intDatosCyl + 1
+                intDatosTotalCyl = intDatosTotalCyl + 1
+            ELSE
+                IF Trim(rsDatos("CYL2RESULTS")) = "FAILED" THEN
+                    intDatosCyl = intDatosCyl - 1
+                    intDatosTotalCyl = intDatosTotalCyl + 1
+                END IF
+            END IF
+            %>
+            <%
+            IF Trim(rsDatos("CYL3RESULTS")) = "PASSED" THEN
+                intDatosCyl = intDatosCyl + 1
+                intDatosTotalCyl = intDatosTotalCyl + 1
+            ELSE
+                IF Trim(rsDatos("CYL3RESULTS")) = "FAILED" THEN
+                    intDatosCyl = intDatosCyl - 1
+                    intDatosTotalCyl = intDatosTotalCyl + 1
+                END IF
+            END IF
+            %>
+            <%
+            IF Trim(rsDatos("CYL4RESULTS")) = "PASSED" THEN
+                intDatosCyl = intDatosCyl + 1
+                intDatosTotalCyl = intDatosTotalCyl + 1
+            ELSE
+                IF Trim(rsDatos("CYL4RESULTS")) = "FAILED" THEN
+                    intDatosCyl = intDatosCyl - 1
+                    intDatosTotalCyl = intDatosTotalCyl + 1
+                END IF
+            END IF
+            %>
+            <%
+            IF Trim(rsDatos("CYL5RESULTS")) = "PASSED" THEN
+                intDatosCyl = intDatosCyl + 1
+                intDatosTotalCyl = intDatosTotalCyl + 1
+            ELSE
+                IF Trim(rsDatos("CYL5RESULTS")) = "FAILED" THEN
+                    intDatosCyl = intDatosCyl - 1
+                    intDatosTotalCyl = intDatosTotalCyl + 1
+                END IF
+            END IF
+            %>
+            <%
+            IF Trim(rsDatos("CYL6RESULTS")) = "PASSED" THEN
+                intDatosCyl = intDatosCyl + 1
+                intDatosTotalCyl = intDatosTotalCyl + 1
+            ELSE
+                IF Trim(rsDatos("CYL6RESULTS")) = "FAILED" THEN
+                    intDatosCyl = intDatosCyl - 1
+                    intDatosTotalCyl = intDatosTotalCyl + 1
+                END IF
+            END IF
+            %>
+            <%
+            IF Trim(rsDatos("CYL7RESULTS")) = "PASSED" THEN
+                intDatosCyl = intDatosCyl + 1
+                intDatosTotalCyl = intDatosTotalCyl + 1
+            ELSE
+                IF Trim(rsDatos("CYL7RESULTS")) = "FAILED" THEN
+                    intDatosCyl = intDatosCyl - 1
+                    intDatosTotalCyl = intDatosTotalCyl + 1
+                END IF
+            END IF
+            %>
+            <%
+            IF Trim(rsDatos("CYL8RESULTS")) = "PASSED" THEN
+                intDatosCyl = intDatosCyl + 1
+                intDatosTotalCyl = intDatosTotalCyl + 1
+            ELSE
+                IF Trim(rsDatos("CYL8RESULTS")) = "FAILED" THEN
+                    intDatosCyl = intDatosCyl - 1
+                    intDatosTotalCyl = intDatosTotalCyl + 1
+                END IF
+            END IF
+            %>
+            <%
+            IF Trim(rsDatos("CYL9RESULTS")) = "PASSED" THEN
+                intDatosCyl = intDatosCyl + 1
+                intDatosTotalCyl = intDatosTotalCyl + 1
+            ELSE
+                IF Trim(rsDatos("CYL9RESULTS")) = "FAILED" THEN
+                    intDatosCyl = intDatosCyl - 1
+                    intDatosTotalCyl = intDatosTotalCyl + 1
+                END IF
+            END IF
+            %>
+            <%
+            IF Trim(rsDatos("CYL10RESULTS")) = "PASSED" THEN
+                intDatosCyl = intDatosCyl + 1
+                intDatosTotalCyl = intDatosTotalCyl + 1
+            ELSE
+                IF Trim(rsDatos("CYL10RESULTS")) = "FAILED" THEN
+                    intDatosCyl = intDatosCyl - 1
+                    intDatosTotalCyl = intDatosTotalCyl + 1
+                END IF
+            END IF
+            %>
+            <%IF intDatosTotalCyl = intDatosCyl THEN%>
+                <%
+                intDatos = intDatos + 1
+                intDatosTotal = intDatosTotal + 1
+                %>
+            <%ELSE %>
+                <%
+                intDatos = intDatos - 1
+                intDatosTotal = intDatosTotal + 1
+                %>
+            <%END IF%>
+            <%IF Trim(rsDatos("VariancePSI")) >= 0 AND  Trim(rsDatos("VariancePSI")) <=25 THEN%>
+                
+                <%
+                intDatos = intDatos + 1
+                intDatosTotal = intDatosTotal + 1
+                %>
+            <%ELSEIF Trim(rsDatos("VariancePSI")) < 0 AND  Trim(rsDatos("VariancePSI")) >25 THEN%>
+                
+                <%
+                intDatos = intDatos - 1
+                intDatosTotal = intDatosTotal + 1
+                %> 
+            <%ELSE%>
+                
+                <%
+                intDatos = intDatos
+                intDatosTotal = intDatosTotal
+                %>      
+            <%END IF%>
+            <%IF Trim(rsDatos("TORQUERESULTS")) = "PASSED" THEN%>
+                
+                <%
+                intDatos = intDatos + 1
+                intDatosTotal = intDatosTotal + 1
+                %>
+            <%ELSEIF Trim(rsDatos("TORQUERESULTS")) = "FAILED" THEN%>
+                
+                <%
+                intDatos = intDatos - 1
+                intDatosTotal = intDatosTotal + 1
+                %>
+            <%ELSE%>
+                
+                <%
+                intDatos = intDatos
+                intDatosTotal = intDatosTotal
+                %>
+            <%END IF%>
+            <%IF Trim(rsDatos("VVTRESULTS")) = "PASSED" THEN%>
+                
+                <%
+                intDatos = intDatos + 1
+                intDatosTotal = intDatosTotal + 1
+                %>
+            <%ELSEIF Trim(rsDatos("VVTRESULTS")) = "FAILED" THEN%>
+                
+                <%
+                intDatos = intDatos - 1
+                intDatosTotal = intDatosTotal + 1
+                %>
+            <%ELSE%>
+
+                <%
+                intDatos = intDatos
+                intDatosTotal = intDatosTotal
+                %>
+            <%END IF%>
+            <%IF Trim(rsDatos("CYLDEACTRESULTS")) = "PASSED" THEN%>
+                
+                <%
+                intDatos = intDatos + 1
+                intDatosTotal = intDatosTotal + 1
+                %>
+            <%ELSEIF Trim(rsDatos("CYLDEACTRESULTS")) = "FAILED" THEN%>
+                
+                <%
+                intDatos = intDatos - 1
+                intDatosTotal = intDatosTotal + 1
+                %>
+            <%ELSE%>
+                
+                <%
+                intDatos = intDatos
+                intDatosTotal = intDatosTotal
+                %>
+            <%END IF%>
+            <%
+            IF intDatosTotal = intDatos THEN
+            .Add "finalresult", "Passed"
+            ELSEIF intDatosTotal <>  intDatos and intDatos > 0 or  intDatos < intDatosTotal THEN
+            .Add "finalresult", "Failed"
+            ELSE
+            .Add "finalresult", "-"
+            END IF
+            
+            .Add "torque", Trim(rsDatos("MAXTRQMEAS"))
+            .Add "pressure", Trim(rsDatos("RUNINOILPSI"))
+            .Add "cyl1", Trim(rsDatos("CYL1COMP"))
+            .Add "cyl2", Trim(rsDatos("CYL2COMP"))
+            .Add "cyl3", Trim(rsDatos("CYL3COMP"))
+            .Add "cyl4", Trim(rsDatos("CYL4COMP"))
+            IF Trim(rsDatos("CYL5RESULTS")) <> "-----" THEN
+            .Add "cyl5", Trim(rsDatos("CYL5COMP"))
+            ELSE
+            .Add "cyl5", "0"
+            END IF
+            IF Trim(rsDatos("CYL6RESULTS")) <> "-----" THEN
+            .Add "cyl6", Trim(rsDatos("CYL6COMP"))
+            ELSE
+            .Add "cyl6", "0"
+            END IF
+            IF Trim(rsDatos("CYL7RESULTS")) <> "-----" THEN
+            .Add "cyl7", Trim(rsDatos("CYL7COMP"))
+            ELSE
+            .Add "cyl7", "0"
+            END IF
+            IF Trim(rsDatos("CYL8RESULTS")) <> "-----" THEN
+            .Add "cyl8", Trim(rsDatos("CYL8COMP"))
+            ELSE
+            .Add "cyl8", "0"
+            END IF
+            IF Trim(rsDatos("CYL9RESULTS")) <> "-----" THEN
+            .Add "cyl9", Trim(rsDatos("CYL9COMP"))
+            ELSE
+            .Add "cyl9", "0"
+            END IF
+            IF Trim(rsDatos("CYL10RESULTS")) <> "-----" THEN
+            .Add "cyl10", Trim(rsDatos("CYL10COMP"))
+            ELSE
+            .Add "cyl10", "0"
+            END IF
+            .Add "min", Trim(rsDatos("COMPMINPSI"))
+            .Add "max", Trim(rsDatos("COMPMAXPSI"))
+            .Add "minall", Trim(rsDatos("Minimo"))
+            .Add "maxall", Trim(rsDatos("Maximo"))
+            .Add "variancepsi", Trim(rsDatos("VariancePSI"))
+            .Add "cyldeact", Trim(rsDatos("CYLDEACTRESULTS"))
+            .Add "vvt", Trim(rsDatos("VVTRESULTS"))
+            .Add "leak", Trim(rsDatos("LEAKRESULTS"))
+            .Add "line", Trim(rsDatos("Linea"))
+
+        End With
+                
+        intDatos = 0
+        intDatosTotal = 0
+        intDatosCyl = 0
+        intDatosTotalCyl = 0
+
+        %>
+
+        <%
+        'rsResultado.Close()
+        'Set rsResultado = Nothing
+        intContador = intContador + 1
+        intJson = intJson + 1
+        Response.Flush()
+        rsDatos.MoveNext()
+        '
+        Wend
+        End With
+    End With
+
+    Response.Write oJSON.JSONoutput()                   'Return json string
+    rsDatos.Close()
+    Set rsDatos = Nothing
+    %>
+                
+
+<%
+Else
+    Response.Write("<br><div class='col-md-3 portlet box red-sunglo' style='text-align:center'><H4><i class='fa fa-check icon-info font-white'>&nbsp No records for this search </i></H4></div>")
+End If
+%>
